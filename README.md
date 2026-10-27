@@ -1,2 +1,42 @@
-# OS_assignment_9_xv6
-Technical Report: Implementing Page Tables, Lazy Allocation, and Page Replacement in xv6 This report summarizes the modifications made across kernel and user-space subsystems of xv6 to implement three features: process page table introspection (vmprint), lazy memory allocation via page faults (sbrk/T_PGFLT), and page replacement algorithms (pagerepl). Question 1: Printing the Page Table of a Process (vmprint) ### Changes Made Kernel Implementation (vm.c): Implemented vmprint() to walk the calling process's page directory (myproc()->pgdir), iterating through valid page directory entries (PDEs) and page table entries (PTEs) below **KERNBASE**. It extracts physical frame addresses and flags (P, W, U) using macro helpers like PTE_ADDR and **P2V**. System Call Wiring (defs.h, syscall.h, syscall.c, sysproc.c, user.h, usys.S, Makefile): Registered system call number 22 for vmprint. User Test Program (pttest.c): Created a test program that calls vmprint() at startup and immediately after calling sbrk(4 * **4096**). What the Output Shows Initial State: Displays 3 valid user pages (text/data, guard page, and stack) alongside 2 total page-table pages. After sbrk(4 * **4096**): Exactly 4 new contiguous virtual pages (va 0x3000 through va 0x6000) appear, raising total valid user pages from 3 to 7 and confirming proper heap growth. Question 2: Handling Page Faults & Lazy Allocation ### Changes Made Process Tracking (proc.h): Added uint numfaults to struct proc to track handled page faults. Lazy sbrk (sysproc.c): Modified sys_sbrk() for n>0 to increase myproc()->sz without invoking physical memory allocation (allocuvm). Robust Fork/Copy (vm.c): Updated copyuvm() to gracefully skip unallocated (never-faulted) pages below sz rather than panicking. Page Fault Trap Handler (trap.c): Handled T_PGFLT by reading faulting addresses via rcr2(). If valid and below sz, it allocates a zeroed physical page using kalloc() and memset(), maps it via mappages(), and increments numfaults. Invalid accesses kill only the offending process. System Call Wiring (getfaults): Registered system call number 23 to return numfaults. User Test Program (faulttest.c): Allocates 32 pages via sbrk, writes to 5 distinct pages, verifies getfaults() equals 5, and tests out-of-bounds protection. What the Output Shows Fault Delta: getfaults() shows 2 initial faults (startup overhead) and rises by exactly 5 after touching 5 pages, confirming lazy loading works correctly (7−2=5). Process Isolation: Accessing memory above sz generates an access violation (pid 3 faulttest: access violation...) that safely terminates only the test process without harming the kernel or shell. Question 3: Page Replacement Algorithms (**FIFO** and **LRU**) ### Changes Made User Program (pagerepl.c): Implemented a user-space simulator modeling **FIFO** and **LRU** page replacement policies. Simulation Logic: Tracks frame states, hits, faults, and hit ratios across configurable frame capacities (3, 4, and 5) using the reference string: 7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1 What the Output Shows 3 Frames Performance: **FIFO** produces 15 page faults (hit ratio: 25%), while **LRU** produces 12 page faults (hit ratio: 40%), validating that **LRU** outperforms **FIFO** due to better locality retention. Capacity Scaling: The comparative summary table confirms how increasing frame capacity reduces page faults and improves hit ratios across both algorithms.
+# xv6 Kernel Modifications: Page Tables, Lazy Allocation, and Page Replacement
+
+This repository contains enhancements and extensions implemented in the **xv6** operating system. The work covers process address space introspection (`vmprint`), on-demand lazy memory allocation via page fault handling, and a comparative simulation of FIFO and LRU page replacement algorithms.
+
+---
+
+## Summary of Changes
+
+### 1. Process Page Table Introspection (`vmprint`)
+* **`vm.c`:** Implemented the kernel-level `vmprint()` function to traverse the active process page directory (`myproc()->pgdir`). It inspects valid page directory entries (PDEs) and page table entries (PTEs) below `KERNBASE`, extracting physical frame addresses and permission flags (`P`, `W`, `U`).
+* **System Call Integration:** Registered system call `SYS_vmprint` (`22`) across `syscall.h`, `syscall.c`, `sysproc.c`, `user.h`, and `usys.S`.
+* **Test Program (`pttest.c`):** Validates address space mappings at startup and after expanding the heap via `sbrk(4 * 4096)`.
+
+### 2. Lazy Allocation & Page Fault Handling
+* **`proc.h`:** Added a `numfaults` counter field to `struct proc`.
+* **`sysproc.c`:** Modified `sys_sbrk()` to increase `myproc()->sz` without eagerly allocating physical memory when $n > 0$.
+* **`vm.c`:** Updated `copyuvm()` to safely skip unallocated/unfaulted pages below `sz` during process duplication (`fork`).
+* **`trap.c`:** Added a `T_PGFLT` trap handler that reads faulting addresses using `rcr2()`. Valid addresses below `sz` dynamically allocate a zeroed physical page (`kalloc`), map it (`mappages`), increment `numfaults`, and resume execution. Invalid accesses terminate only the offending process.
+* **System Call Integration (`getfaults`):** Registered system call `SYS_getfaults` (`23`) to expose the fault counter.
+* **Test Program (`faulttest.c`):** Verifies that writing to 5 distinct unallocated pages triggers exactly 5 page faults, and tests out-of-bounds protection.
+
+### 3. Page Replacement Simulator (`pagerepl`)
+* **`pagerepl.c`:** Implemented a user-space simulator evaluating **FIFO** and **LRU** page replacement policies against the reference string `7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1`.
+* **Output Analysis:** Tracks hit/fault traces per reference and computes comparative performance across 3, 4, and 5 frames.
+
+---
+
+## Experimental Results & Output Analysis
+
+### Question 1: `pttest` Output
+Running `pttest` inside xv6 demonstrates dynamic heap expansion:
+* **Initial State:** Displays 3 valid user pages (text/data, guard page, and stack) and 2 page-table pages.
+* **After `sbrk(4 * 4096)`:** Exactly 4 new contiguous virtual pages (`va 0x3000` through `va 0x6000`) appear, increasing total valid user pages from 3 to **7**.
+
+### Question 2: `faulttest` Output
+Running `faulttest` confirms lazy loading and process isolation:
+```text
+--- faulttest: starting ---
+Initial page faults: 2
+Accessed 5 pages. Total page faults: 7 (Expected: 5)
+Testing invalid access above sbrk size (should kill process)...
+pid 3 faulttest: access violation / invalid page fault at va 0x24000 (sz 0x23000)
