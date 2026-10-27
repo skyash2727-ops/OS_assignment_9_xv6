@@ -40,3 +40,52 @@ Initial page faults: 2
 Accessed 5 pages. Total page faults: 7 (Expected: 5)
 Testing invalid access above sbrk size (should kill process)...
 pid 3 faulttest: access violation / invalid page fault at va 0x24000 (sz 0x23000)
+
+### 3. Page Replacement Simulator (`pagerepl.c`)
+#### Detailed Output Log (3 Frames)
+```text
+=== FIFO Algorithm (3 Frames) ===
+Ref: 7 -> Fault   | Frames: [ 7 - - ]
+Ref: 0 -> Fault   | Frames: [ 7 0 - ]
+Ref: 1 -> Fault   | Frames: [ 7 0 1 ]
+Ref: 2 -> Fault   | Frames: [ 2 0 1 ]
+Ref: 0 -> Hit     | Frames: [ 2 0 1 ]
+Ref: 3 -> Fault   | Frames: [ 2 3 1 ]
+Ref: 0 -> Fault   | Frames: [ 2 3 0 ]
+Ref: 4 -> Fault   | Frames: [ 4 3 0 ]
+Ref: 2 -> Fault   | Frames: [ 4 2 0 ]
+Ref: 3 -> Fault   | Frames: [ 4 2 3 ]
+Ref: 0 -> Fault   | Frames: [ 0 2 3 ]
+Ref: 3 -> Hit     | Frames: [ 0 2 3 ]
+Ref: 2 -> Hit     | Frames: [ 0 2 3 ]
+Ref: 1 -> Fault   | Frames: [ 0 1 3 ]
+Ref: 2 -> Fault   | Frames: [ 0 1 2 ]
+Ref: 0 -> Hit     | Frames: [ 0 1 2 ]
+Ref: 1 -> Hit     | Frames: [ 0 1 2 ]
+Ref: 7 -> Fault   | Frames: [ 7 1 2 ]
+Ref: 0 -> Fault   | Frames: [ 7 0 2 ]
+Ref: 1 -> Fault   | Frames: [ 7 0 1 ]
+FIFO Summary -> Faults: 15, Hits: 5, Hit Ratio: 25%
+
+=== LRU Algorithm (3 Frames) ===
+Ref: 7 -> Fault   | Frames: [ 7 - - ]
+Ref: 0 -> Fault   | Frames: [ 7 0 - ]
+Ref: 1 -> Fault   | Frames: [ 7 0 1 ]
+Ref: 2 -> Fault   | Frames: [ 2 0 1 ]
+Ref: 0 -> Hit     | Frames: [ 2 0 1 ]
+Ref: 3 -> Fault   | Frames: [ 2 0 3 ]
+Ref: 0 -> Hit     | Frames: [ 2 0 3 ]
+Ref: 4 -> Fault   | Frames: [ 4 0 3 ]
+Ref: 2 -> Fault   | Frames: [ 4 0 2 ]
+Ref: 3 -> Fault   | Frames: [ 3 0 2 ]
+Ref: 0 -> Hit     | Frames: [ 3 0 2 ]
+Ref: 3 -> Hit     | Frames: [ 3 0 2 ]
+Ref: 2 -> Hit     | Frames: [ 3 0 2 ]
+Ref: 1 -> Fault   | Frames: [ 1 0 2 ]
+Ref: 2 -> Hit     | Frames: [ 1 0 2 ]
+Ref: 0 -> Hit     | Frames: [ 1 0 2 ]
+Ref: 1 -> Hit     | Frames: [ 1 0 2 ]
+Ref: 7 -> Fault   | Frames: [ 1 7 2 ]
+Ref: 0 -> Fault   | Frames: [ 1 7 0 ]
+Ref: 1 -> Hit     | Frames: [ 1 7 0 ]
+LRU Summary  -> Faults: 12, Hits: 8, Hit Ratio: 40%
